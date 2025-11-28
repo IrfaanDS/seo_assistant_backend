@@ -55,16 +55,24 @@ def retrieve(query: str, top_k=5):
     documents = results["documents"][0]
     return "\n\n".join(documents)
 
-
-def generate_answer(query: str):
-    """Generate SEO answer using Groq."""
+def generate_answer(query: str, history: list = None): # <-- MODIFIED: Add history parameter
+    """Generate SEO answer using Groq with memory."""
     context = retrieve(query)
 
+    # 1. Construct the history string for the prompt
+    history_string = ""
+    if history:
+        history_string = "Previous Conversation:\n" + "\n".join(
+            [f"User: {h['question']}\nAssistant: {h['answer']}" for h in history]
+        ) + "\n\n"
+
+    # 2. Update the prompt to include history
     prompt = f"""
 You are an expert SEO assistant.
 
 ANSWER THE USER STRICTLY USING THE CONTEXT.
 
+{history_string}
 Query:
 {query}
 
@@ -73,10 +81,14 @@ Relevant Context:
 
 If the answer is not in the context, say: "The provided documents do not contain the required information."
 """
-
+    # 3. Create the messages list for the Groq API call
+    # The system instruction is the first message.
+    messages = [{"role": "system", "content": prompt}] # Pass the full prompt as a system message.
+    
+    # 4. Use the updated prompt and call the API
     resp = groq_client.chat.completions.create(
         model="llama-3.1-8b-instant",
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
         max_tokens=350
     )
 
